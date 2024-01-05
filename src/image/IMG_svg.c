@@ -23,8 +23,7 @@
  * https://github.com/memononen/nanosvg
  */
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_SVG
 
@@ -96,14 +95,12 @@ int IMG_isSVG(SDL_RWops *src)
         return 0;
     start = SDL_RWtell(src);
     is_SVG = 0;
-    magic_len = SDL_RWread(src, magic, sizeof(magic) - 1);
-    if (magic_len > 0) {
-        magic[magic_len] = '\0';
-        if (SDL_strstr(magic, "<svg")) {
-            is_SVG = 1;
-        }
+    magic_len = SDL_RWread(src, magic, 1, sizeof(magic) - 1);
+    magic[magic_len] = '\0';
+    if (SDL_strstr(magic, "<svg")) {
+        is_SVG = 1;
     }
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return(is_SVG);
 }
 
@@ -149,9 +146,11 @@ SDL_Surface *IMG_LoadSizedSVG_RW(SDL_RWops *src, int width, int height)
         scale = 1.0f;
     }
 
-    surface = SDL_CreateSurface((int)SDL_ceilf(image->width * scale),
-                                (int)SDL_ceilf(image->height * scale),
-                                SDL_PIXELFORMAT_RGBA32);
+    surface = SDL_CreateRGBSurfaceWithFormat(0,
+                                             (int)SDL_ceilf(image->width * scale),
+                                             (int)SDL_ceilf(image->height * scale),
+                                             32,
+                                             SDL_PIXELFORMAT_RGBA32);
 
     if (!surface) {
         nsvgDeleteRasterizer(rasterizer);

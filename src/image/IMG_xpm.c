@@ -45,8 +45,7 @@
  * requires about 13K in binary form.
  */
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_XPM
 
@@ -61,12 +60,12 @@ int IMG_isXPM(SDL_RWops *src)
         return 0;
     start = SDL_RWtell(src);
     is_XPM = 0;
-    if ( SDL_RWread(src, magic, sizeof(magic)) == sizeof(magic) ) {
+    if ( SDL_RWread(src, magic, sizeof(magic), 1) ) {
         if ( SDL_memcmp(magic, "/* XPM */", sizeof(magic)) == 0 ) {
             is_XPM = 1;
         }
     }
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return(is_XPM);
 }
 
@@ -117,7 +116,7 @@ static struct color_hash *create_colorhash(int maxnum)
 
     bytes = hash->size * sizeof(struct hash_entry **);
     /* Check for overflow */
-    if ((bytes / sizeof(struct hash_entry **)) != (Uint32)hash->size) {
+    if ((bytes / sizeof(struct hash_entry **)) != hash->size) {
         IMG_SetError("memory allocation overflow");
         SDL_free(hash);
         return NULL;
@@ -130,7 +129,7 @@ static struct color_hash *create_colorhash(int maxnum)
 
     bytes = maxnum * sizeof(struct hash_entry);
     /* Check for overflow */
-    if ((bytes / sizeof(struct hash_entry)) != (Uint32)maxnum) {
+    if ((bytes / sizeof(struct hash_entry)) != maxnum) {
         IMG_SetError("memory allocation overflow");
         SDL_free(hash->table);
         SDL_free(hash);
@@ -903,7 +902,7 @@ static int color_to_argb(char *spec, int speclen, Uint32 *argb)
         *argb = 0xff000000 | (Uint32)SDL_strtol(buf, NULL, 16);
         return 1;
     } else {
-        size_t i;
+        int i;
         for (i = 0; i < SDL_arraysize(known); i++) {
             if (SDL_strncasecmp(known[i].name, spec, speclen) == 0) {
                 *argb = known[i].argb;
@@ -915,7 +914,7 @@ static int color_to_argb(char *spec, int speclen, Uint32 *argb)
 }
 
 static char *linebuf;
-static size_t buflen;
+static int buflen;
 static char *error;
 
 /*
@@ -923,7 +922,7 @@ static char *error;
  * If len > 0, it's assumed to be at least len chars (for efficiency).
  * Return NULL and set error upon EOF or parse error.
  */
-static char *get_next_line(char ***lines, SDL_RWops *src, size_t len)
+static char *get_next_line(char ***lines, SDL_RWops *src, int len)
 {
     char *linebufnew;
 
@@ -931,15 +930,15 @@ static char *get_next_line(char ***lines, SDL_RWops *src, size_t len)
         return *(*lines)++;
     } else {
         char c;
-        size_t n;
+        int n;
         do {
-            if (SDL_RWread(src, &c, 1) != 1) {
+            if (!SDL_RWread(src, &c, 1, 1)) {
                 error = "Premature end of data";
                 return NULL;
             }
         } while (c != '"');
         if (len) {
-            len += 3;   /* "\",\n" */
+            len += 4;   /* "\",\n\0" */
             if (len > buflen){
                 buflen = len;
                 linebufnew = (char *)SDL_realloc(linebuf, buflen);
@@ -950,15 +949,15 @@ static char *get_next_line(char ***lines, SDL_RWops *src, size_t len)
                 }
                 linebuf = linebufnew;
             }
-            if (SDL_RWread(src, linebuf, len) != len) {
+            if (!SDL_RWread(src, linebuf, len - 1, 1)) {
                 error = "Premature end of data";
                 return NULL;
             }
-            n = len - 1;
+            n = len - 2;
         } else {
             n = 0;
             do {
-                if (n >= buflen) {
+                if (n >= buflen - 1) {
                     if (buflen == 0)
                         buflen = 16;
                     buflen *= 2;
@@ -970,7 +969,7 @@ static char *get_next_line(char ***lines, SDL_RWops *src, size_t len)
                     }
                     linebuf = linebufnew;
                 }
-                if (SDL_RWread(src, linebuf + n, 1) != 1) {
+                if (!SDL_RWread(src, linebuf + n, 1, 1)) {
                     error = "Premature end of data";
                     return NULL;
                 }
@@ -1009,7 +1008,7 @@ static SDL_Surface *load_xpm(char **xpm, SDL_RWops *src, SDL_bool force_32bit)
     char *keystrings = NULL, *nextkey;
     char *line;
     char ***xpmlines = NULL;
-    size_t pixels_len;
+    int pixels_len;
 
     error = NULL;
     linebuf = NULL;
@@ -1040,7 +1039,7 @@ static SDL_Surface *load_xpm(char **xpm, SDL_RWops *src, SDL_bool force_32bit)
     }
 
     /* Check for allocation overflow */
-    if ((size_t)((Uint32)ncolors * cpp)/cpp != (Uint32)ncolors) {
+    if ((size_t)(ncolors * cpp)/cpp != ncolors) {
         error = "Invalid color specification";
         goto done;
     }
@@ -1054,12 +1053,12 @@ static SDL_Surface *load_xpm(char **xpm, SDL_RWops *src, SDL_bool force_32bit)
     /* Create the new surface */
     if (ncolors <= 256 && !force_32bit) {
         indexed = 1;
-        image = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_INDEX8);
+        image = SDL_CreateRGBSurfaceWithFormat(0, w, h, 0, SDL_PIXELFORMAT_INDEX8);
         im_colors = image->format->palette->colors;
         image->format->palette->ncolors = ncolors;
     } else {
         indexed = 0;
-        image = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+        image = SDL_CreateRGBSurfaceWithFormat(0, w, h, 0, SDL_PIXELFORMAT_ARGB8888);
     }
     if (!image) {
         /* Hmm, some SDL error (out of memory?) */
@@ -1111,7 +1110,7 @@ static SDL_Surface *load_xpm(char **xpm, SDL_RWops *src, SDL_bool force_32bit)
                 c->b = (Uint8)(argb);
                 pixel = index;
                 if (argb == 0x00000000) {
-                    SDL_SetSurfaceColorKey(image, SDL_TRUE, pixel);
+                    SDL_SetColorKey(image, SDL_TRUE, pixel);
                 }
             } else {
                 pixel = argb;
@@ -1153,9 +1152,9 @@ static SDL_Surface *load_xpm(char **xpm, SDL_RWops *src, SDL_bool force_32bit)
 done:
     if (error) {
         if ( src )
-            SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+            SDL_RWseek(src, start, RW_SEEK_SET);
         if ( image ) {
-            SDL_DestroySurface(image);
+            SDL_FreeSurface(image);
             image = NULL;
         }
         IMG_SetError("%s", error);

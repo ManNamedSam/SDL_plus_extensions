@@ -23,8 +23,7 @@
 
 /* This is a TIFF image file loading framework */
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_TIF
 
@@ -49,7 +48,7 @@ static struct {
     lib.FUNC = FUNC;
 #endif
 
-int IMG_InitTIF(void)
+int IMG_InitTIF()
 {
     if ( lib.loaded == 0 ) {
 #ifdef LOAD_TIF_DYNAMIC
@@ -68,7 +67,7 @@ int IMG_InitTIF(void)
 
     return 0;
 }
-void IMG_QuitTIF(void)
+void IMG_QuitTIF()
 {
     if ( lib.loaded == 0 ) {
         return;
@@ -88,7 +87,7 @@ void IMG_QuitTIF(void)
 
 static tsize_t tiff_read(thandle_t fd, tdata_t buf, tsize_t size)
 {
-    return SDL_RWread((SDL_RWops*)fd, buf, size);
+    return (tsize_t)SDL_RWread((SDL_RWops*)fd, buf, 1, size);
 }
 
 static toff_t tiff_seek(thandle_t fd, toff_t offset, int origin)
@@ -98,12 +97,11 @@ static toff_t tiff_seek(thandle_t fd, toff_t offset, int origin)
 
 static tsize_t tiff_write(thandle_t fd, tdata_t buf, tsize_t size)
 {
-    return SDL_RWwrite((SDL_RWops*)fd, buf, size);
+    return (tsize_t)SDL_RWwrite((SDL_RWops*)fd, buf, 1, size);
 }
 
 static int tiff_close(thandle_t fd)
 {
-    (void)fd;
     /*
      * We don't want libtiff closing our SDL_RWops*, but if it's not given
          * a routine to try, and if the image isn't a TIFF, it'll segfault.
@@ -113,17 +111,11 @@ static int tiff_close(thandle_t fd)
 
 static int tiff_map(thandle_t fd, tdata_t* pbase, toff_t* psize)
 {
-    (void)fd;
-    (void)pbase;
-    (void)psize;
     return (0);
 }
 
 static void tiff_unmap(thandle_t fd, tdata_t base, toff_t size)
 {
-    (void)fd;
-    (void)base;
-    (void)size;
     return;
 }
 
@@ -133,9 +125,9 @@ static toff_t tiff_size(thandle_t fd)
     toff_t size;
 
     save_pos = SDL_RWtell((SDL_RWops*)fd);
-    SDL_RWseek((SDL_RWops*)fd, 0, SDL_RW_SEEK_END);
+    SDL_RWseek((SDL_RWops*)fd, 0, RW_SEEK_END);
     size = SDL_RWtell((SDL_RWops*)fd);
-    SDL_RWseek((SDL_RWops*)fd, save_pos, SDL_RW_SEEK_SET);
+    SDL_RWseek((SDL_RWops*)fd, save_pos, RW_SEEK_SET);
     return size;
 }
 
@@ -149,7 +141,7 @@ int IMG_isTIF(SDL_RWops* src)
         return 0;
     start = SDL_RWtell(src);
     is_TIF = 0;
-    if ( SDL_RWread(src, magic, sizeof(magic)) == sizeof(magic) ) {
+    if ( SDL_RWread(src, magic, 1, sizeof(magic)) == sizeof(magic) ) {
         if ( (magic[0] == 'I' &&
                       magic[1] == 'I' &&
               magic[2] == 0x2a &&
@@ -161,7 +153,7 @@ int IMG_isTIF(SDL_RWops* src)
             is_TIF = 1;
         }
     }
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return(is_TIF);
 }
 
@@ -192,7 +184,7 @@ SDL_Surface* IMG_LoadTIF_RW(SDL_RWops* src)
     lib.TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &img_width);
     lib.TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &img_height);
 
-    surface = SDL_CreateSurface(img_width, img_height, SDL_PIXELFORMAT_ABGR8888);
+    surface = SDL_CreateRGBSurfaceWithFormat(0, img_width, img_height, 0, SDL_PIXELFORMAT_ABGR8888);
     if(!surface)
         goto error;
 
@@ -204,9 +196,9 @@ SDL_Surface* IMG_LoadTIF_RW(SDL_RWops* src)
     return surface;
 
 error:
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     if (surface) {
-        SDL_DestroySurface(surface);
+        SDL_FreeSurface(surface);
     }
     if (tiff) {
         lib.TIFFClose(tiff);
@@ -219,29 +211,25 @@ error:
 #pragma warning(disable : 4100) /* warning C4100: 'op' : unreferenced formal parameter */
 #endif
 
-int IMG_InitTIF(void)
+int IMG_InitTIF()
 {
     IMG_SetError("TIFF images are not supported");
     return(-1);
 }
 
-void IMG_QuitTIF(void)
+void IMG_QuitTIF()
 {
 }
 
 /* See if an image is contained in a data source */
 int IMG_isTIF(SDL_RWops *src)
 {
-    (void)src;
-
     return(0);
 }
 
 /* Load a TIFF type image from an SDL datasource */
 SDL_Surface *IMG_LoadTIF_RW(SDL_RWops *src)
 {
-    (void)src;
-
     return(NULL);
 }
 

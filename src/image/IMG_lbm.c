@@ -30,9 +30,8 @@
    Buffer overflow fix in RLE decompression by David Raulo in January 2008.
 */
 
-#include <SDL3/SDL_endian.h>
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_endian.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_LBM
 
@@ -66,7 +65,7 @@ int IMG_isLBM( SDL_RWops *src )
         return 0;
     start = SDL_RWtell(src);
     is_LBM = 0;
-    if ( SDL_RWread( src, magic, sizeof(magic) ) == sizeof(magic) )
+    if ( SDL_RWread( src, magic, sizeof(magic), 1 ) )
     {
         if ( !SDL_memcmp( magic, "FORM", 4 ) &&
             ( !SDL_memcmp( magic + 8, "PBM ", 4 ) ||
@@ -75,7 +74,7 @@ int IMG_isLBM( SDL_RWops *src )
             is_LBM = 1;
         }
     }
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return( is_LBM );
 }
 
@@ -102,14 +101,14 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
     }
     start = SDL_RWtell(src);
 
-    if ( SDL_RWread( src, id, 4 ) != 4 )
+    if ( !SDL_RWread( src, id, 4, 1 ) )
     {
         error="error reading IFF chunk";
         goto done;
     }
 
     /* Should be the size of the file minus 4+4 ( 'FORM'+size ) */
-    if ( SDL_RWread( src, &size, 4 ) != 4 )
+    if ( !SDL_RWread( src, &size, 4, 1 ) )
     {
         error="error reading IFF chunk size";
         goto done;
@@ -123,7 +122,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
         goto done;
     }
 
-    if ( SDL_RWread( src, id, 4 ) != 4 )
+    if ( !SDL_RWread( src, id, 4, 1 ) )
     {
         error="error reading IFF chunk";
         goto done;
@@ -147,13 +146,13 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
 
     while ( SDL_memcmp( id, "BODY", 4 ) != 0 )
     {
-        if ( SDL_RWread( src, id, 4 ) != 4 )
+        if ( !SDL_RWread( src, id, 4, 1 ) )
         {
             error="error reading IFF chunk";
             goto done;
         }
 
-        if ( SDL_RWread( src, &size, 4 ) != 4 )
+        if ( !SDL_RWread( src, &size, 4, 1 ) )
         {
             error="error reading IFF chunk size";
             goto done;
@@ -165,7 +164,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
 
         if ( !SDL_memcmp( id, "BMHD", 4 ) ) /* Bitmap header */
         {
-            if ( SDL_RWread( src, &bmhd, sizeof( BMHD ) ) != sizeof( BMHD ) )
+            if ( !SDL_RWread( src, &bmhd, sizeof( BMHD ), 1 ) )
             {
                 error="error reading BMHD chunk";
                 goto done;
@@ -189,7 +188,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
                 goto done;
             }
 
-            if ( SDL_RWread( src, colormap, size ) != size )
+            if ( !SDL_RWread( src, colormap, size, 1 ) )
             {
                 error="error reading CMAP chunk";
                 goto done;
@@ -202,7 +201,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
         if ( !SDL_memcmp( id, "CAMG", 4 ) ) /* Amiga ViewMode  */
         {
             Uint32 viewmodes;
-            if ( SDL_RWread( src, &viewmodes, sizeof(viewmodes) ) != sizeof(viewmodes) )
+            if ( !SDL_RWread( src, &viewmodes, sizeof(viewmodes), 1 ) )
             {
                 error="error reading CAMG chunk";
                 goto done;
@@ -221,7 +220,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
             if ( size & 1 ) ++size;     /* padding ! */
             size -= bytesloaded;
             /* skip the remaining bytes of this chunk */
-            if ( size ) SDL_RWseek( src, size, SDL_RW_SEEK_CUR );
+            if ( size ) SDL_RWseek( src, size, RW_SEEK_CUR );
         }
     }
 
@@ -260,13 +259,13 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
           format = SDL_PIXELFORMAT_BGR24;
 #endif
        }
-        if ((Image = SDL_CreateSurface(width, bmhd.h, format)) == NULL){
+        if ((Image = SDL_CreateRGBSurfaceWithFormat(0, width, bmhd.h, 0, format)) == NULL){
             goto done;
         }
     }
 
     if ( bmhd.mask & 2 )               /* There is a transparent color */
-        SDL_SetSurfaceColorKey( Image, SDL_TRUE, bmhd.tcolor );
+        SDL_SetColorKey( Image, SDL_TRUE, bmhd.tcolor );
 
     /* Update palette information */
 
@@ -332,7 +331,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
             {
                 do
                 {
-                    if ( SDL_RWread( src, &count, 1 ) != 1 )
+                    if ( !SDL_RWread( src, &count, 1, 1 ) )
                     {
                         error="error reading BODY chunk";
                         goto done;
@@ -343,7 +342,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
                         count ^= 0xFF;
                         count += 2; /* now it */
 
-                        if ( ( count > remainingbytes ) || SDL_RWread( src, &color, 1 ) != 1 )
+                        if ( ( count > remainingbytes ) || !SDL_RWread( src, &color, 1, 1 ) )
                         {
                             error="error reading BODY chunk";
                             goto done;
@@ -354,7 +353,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
                     {
                         ++count;
 
-                        if ( ( count > remainingbytes ) || SDL_RWread( src, ptr, count ) != count )
+                        if ( ( count > remainingbytes ) || !SDL_RWread( src, ptr, count, 1 ) )
                         {
                            error="error reading BODY chunk";
                             goto done;
@@ -368,7 +367,7 @@ SDL_Surface *IMG_LoadLBM_RW( SDL_RWops *src )
             }
             else
             {
-                if ( SDL_RWread( src, ptr, bytesperline ) != bytesperline )
+                if ( !SDL_RWread( src, ptr, bytesperline, 1 ) )
                 {
                     error="error reading BODY chunk";
                     goto done;
@@ -484,9 +483,9 @@ done:
 
     if ( error )
     {
-        SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+        SDL_RWseek(src, start, RW_SEEK_SET);
         if ( Image ) {
-            SDL_DestroySurface( Image );
+            SDL_FreeSurface( Image );
             Image = NULL;
         }
         IMG_SetError( "%s", error );

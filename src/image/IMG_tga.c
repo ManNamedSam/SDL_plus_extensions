@@ -23,10 +23,9 @@
 
 /* This is a Targa image file loading framework */
 
-#include <SDL3/SDL_endian.h>
+#include "SDL_endian.h"
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_TGA
 
@@ -35,9 +34,9 @@
  * Supports: Reading 8, 15, 16, 24 and 32bpp images, with alpha or colourkey,
  *           uncompressed or RLE encoded.
  *
- * 2000-06-10 Mattias EngdegÃ¥rd <f91-men@nada.kth.se>: initial version
- * 2000-06-26 Mattias EngdegÃ¥rd <f91-men@nada.kth.se>: read greyscale TGAs
- * 2000-08-09 Mattias EngdegÃ¥rd <f91-men@nada.kth.se>: alpha inversion removed
+ * 2000-06-10 Mattias Engdegård <f91-men@nada.kth.se>: initial version
+ * 2000-06-26 Mattias Engdegård <f91-men@nada.kth.se>: read greyscale TGAs
+ * 2000-08-09 Mattias Engdegård <f91-men@nada.kth.se>: alpha inversion removed
  */
 
 struct TGAheader {
@@ -107,7 +106,7 @@ SDL_Surface *IMG_LoadTGA_RW(SDL_RWops *src)
     }
     start = SDL_RWtell(src);
 
-    if (SDL_RWread(src, &hdr, sizeof(hdr)) != sizeof(hdr)) {
+    if (!SDL_RWread(src, &hdr, sizeof(hdr), 1)) {
         error = "Error reading TGA data";
         goto error;
     }
@@ -175,26 +174,23 @@ SDL_Surface *IMG_LoadTGA_RW(SDL_RWops *src)
         goto unsupported;
     }
 
-    SDL_RWseek(src, hdr.infolen, SDL_RW_SEEK_CUR); /* skip info field */
+    SDL_RWseek(src, hdr.infolen, RW_SEEK_CUR); /* skip info field */
 
     w = LE16(hdr.width);
     h = LE16(hdr.height);
-    img = SDL_CreateSurface(w, h, format);
+    img = SDL_CreateRGBSurfaceWithFormat(0, w, h, 0, format);
     if (img == NULL) {
         error = "Out of memory";
         goto error;
     }
 
     if (hdr.has_cmap) {
-        size_t palsiz = ncols * ((hdr.cmap_bits + 7) >> 3);
+        int palsiz = ncols * ((hdr.cmap_bits + 7) >> 3);
         if (indexed && !grey) {
             Uint8 *pal = (Uint8 *)SDL_malloc(palsiz), *p = pal;
             SDL_Color *colors = img->format->palette->colors;
             img->format->palette->ncolors = ncols;
-            if (SDL_RWread(src, pal, palsiz) != palsiz) {
-                error = "Error reading TGA data";
-                goto error;
-            }
+            SDL_RWread(src, pal, palsiz, 1);
             for(i = 0; i < ncols; i++) {
                 switch(hdr.cmap_bits) {
                 case 15:
@@ -219,10 +215,10 @@ SDL_Surface *IMG_LoadTGA_RW(SDL_RWops *src)
             }
             SDL_free(pal);
             if (ckey >= 0)
-                SDL_SetSurfaceColorKey(img, SDL_TRUE, ckey);
+                SDL_SetColorKey(img, SDL_TRUE, ckey);
         } else {
             /* skip unneeded colormap */
-            SDL_RWseek(src, palsiz, SDL_RW_SEEK_CUR);
+            SDL_RWseek(src, palsiz, RW_SEEK_CUR);
         }
     }
 
@@ -254,10 +250,7 @@ SDL_Surface *IMG_LoadTGA_RW(SDL_RWops *src)
                     int n = count;
                     if (n > w - x)
                         n = w - x;
-                    if (SDL_RWread(src, dst + x * bpp, n * bpp) != (size_t)(n * bpp)) {
-                        error = "Error reading TGA data";
-                        goto error;
-                    }
+                    SDL_RWread(src, dst + x * bpp, n * bpp, 1);
                     count -= n;
                     x += n;
                     if (x == w)
@@ -275,25 +268,16 @@ SDL_Surface *IMG_LoadTGA_RW(SDL_RWops *src)
                         break;
                 }
 
-                if (SDL_RWread(src, &c, 1) != 1) {
-                    error = "Error reading TGA data";
-                    goto error;
-                }
+                SDL_RWread(src, &c, 1, 1);
                 if (c & 0x80) {
-                    if (SDL_RWread(src, &pixel, bpp) != (size_t)bpp) {
-                        error = "Error reading TGA data";
-                        goto error;
-                    }
+                    SDL_RWread(src, &pixel, bpp, 1);
                     rep = (c & 0x7f) + 1;
                 } else {
                     count = c + 1;
                 }
             }
         } else {
-            if (SDL_RWread(src, dst, w * bpp) != (size_t)(w * bpp)) {
-                error = "Error reading TGA data";
-                goto error;
-            }
+            SDL_RWread(src, dst, w * bpp, 1);
         }
 #if SDL_BYTEORDER == SDL_BIG_ENDIAN
         if (bpp == 2) {
@@ -312,9 +296,9 @@ unsupported:
     error = "Unsupported TGA format";
 
 error:
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     if ( img ) {
-        SDL_DestroySurface(img);
+        SDL_FreeSurface(img);
     }
     IMG_SetError("%s", error);
     return NULL;

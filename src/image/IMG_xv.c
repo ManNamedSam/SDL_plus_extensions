@@ -21,15 +21,14 @@
 
 /* This is a XV thumbnail image file loading framework */
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_XV
 
 static int get_line(SDL_RWops *src, char *line, int size)
 {
     while ( size > 0 ) {
-        if ( SDL_RWread(src, line, 1) != 1 ) {
+        if ( !SDL_RWread(src, line, 1, 1) ) {
             return -1;
         }
         if ( *line == '\r' ) {
@@ -93,7 +92,7 @@ int IMG_isXV(SDL_RWops *src)
     if ( get_header(src, &w, &h) == 0 ) {
         is_XV = 1;
     }
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return(is_XV);
 }
 
@@ -119,7 +118,7 @@ SDL_Surface *IMG_LoadXV_RW(SDL_RWops *src)
     }
 
     /* Create the 3-3-2 indexed palette surface */
-    surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGB332);
+    surface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 0, SDL_PIXELFORMAT_RGB332);
     if ( surface == NULL ) {
         error = "Out of memory";
         goto done;
@@ -127,7 +126,7 @@ SDL_Surface *IMG_LoadXV_RW(SDL_RWops *src)
 
     /* Load the image data */
     for ( pixels = (Uint8 *)surface->pixels; h > 0; --h ) {
-        if ( SDL_RWread(src, pixels, w) != (size_t)w ) {
+        if ( !SDL_RWread(src, pixels, w, 1) ) {
             error = "Couldn't read image data";
             goto done;
         }
@@ -136,9 +135,9 @@ SDL_Surface *IMG_LoadXV_RW(SDL_RWops *src)
 
 done:
     if ( error ) {
-        SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+        SDL_RWseek(src, start, RW_SEEK_SET);
         if ( surface ) {
-            SDL_DestroySurface(surface);
+            SDL_FreeSurface(surface);
             surface = NULL;
         }
         IMG_SetError("%s", error);

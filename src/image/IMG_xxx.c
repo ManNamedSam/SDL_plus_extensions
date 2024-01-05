@@ -21,13 +21,11 @@
 
 /* This is a generic "format not supported" image framework */
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_XXX
 
 /* See if an image is contained in a data source */
-/* Remember to declare this procedure in IMG.h . */
 int IMG_isXXX(SDL_RWops *src)
 {
     int start;
@@ -42,12 +40,11 @@ int IMG_isXXX(SDL_RWops *src)
 
     /* Detect the image here */
 
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return is_XXX;
 }
 
 /* Load an XXX type image from an SDL datasource */
-/* Remember to declare this procedure in IMG.h . */
 SDL_Surface *IMG_LoadXXX_RW(SDL_RWops *src)
 {
     int start;
@@ -64,9 +61,9 @@ SDL_Surface *IMG_LoadXXX_RW(SDL_RWops *src)
     /* Load the image here */
 
     if (error) {
-        SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+        SDL_RWseek(src, start, RW_SEEK_SET);
         if (surface) {
-            SDL_DestroySurface(surface);
+            SDL_FreeSurface(surface);
             surface = NULL;
         }
         IMG_SetError("%s", error);

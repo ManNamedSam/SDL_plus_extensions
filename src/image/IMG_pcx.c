@@ -33,10 +33,9 @@
  *  4-plane 32bpp format with a fourth "intensity" plane
  */
 
-#include <SDL3/SDL_endian.h>
+#include "SDL_endian.h"
 
-#include <SDL3_image/SDL_image.h>
-#include "IMG.h"
+#include "SDL_image.h"
 
 #ifdef LOAD_PCX
 
@@ -72,7 +71,7 @@ int IMG_isPCX(SDL_RWops *src)
         return 0;
     start = SDL_RWtell(src);
     is_PCX = 0;
-    if ( SDL_RWread(src, &pcxh, sizeof(pcxh)) == sizeof(pcxh) ) {
+    if ( SDL_RWread(src, &pcxh, sizeof(pcxh), 1) == 1 ) {
         if ( (pcxh.Manufacturer == ZSoft_Manufacturer) &&
              (pcxh.Version == PC_Paintbrush_Version) &&
              (pcxh.Encoding == PCX_RunLength_Encoding ||
@@ -80,7 +79,7 @@ int IMG_isPCX(SDL_RWops *src)
             is_PCX = 1;
         }
     }
-    SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+    SDL_RWseek(src, start, RW_SEEK_SET);
     return(is_PCX);
 }
 
@@ -91,8 +90,7 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
     struct PCXheader pcxh;
     SDL_Surface *surface = NULL;
     int width, height;
-    int y;
-    size_t bpl;
+    int y, bpl;
     Uint8 *row, *buf = NULL;
     char *error = NULL;
     int bits, src_bits;
@@ -106,7 +104,7 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
     }
     start = SDL_RWtell(src);
 
-    if ( SDL_RWread(src, &pcxh, sizeof(pcxh)) != sizeof(pcxh) ) {
+    if ( !SDL_RWread(src, &pcxh, sizeof(pcxh), 1) ) {
         error = "file truncated";
         goto done;
     }
@@ -145,7 +143,7 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
         error = "unsupported PCX format";
         goto done;
     }
-    surface = SDL_CreateSurface(width, height, format);
+    surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 0, format);
     if ( surface == NULL ) {
         goto done;
     }
@@ -159,16 +157,16 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
     row = (Uint8 *)surface->pixels;
     for ( y=0; y<surface->h; ++y ) {
         /* decode a scan line to a temporary buffer first */
-        size_t i;
+        int i;
         if ( pcxh.Encoding == 0 ) {
-            if ( SDL_RWread(src, buf, bpl) != bpl ) {
+            if ( !SDL_RWread(src, buf, bpl, 1) ) {
                 error = "file truncated";
                 goto done;
             }
         } else {
             for ( i = 0; i < bpl; i++ ) {
                 if ( !count ) {
-                    if ( SDL_RWread(src, &ch, 1) != 1 ) {
+                    if ( !SDL_RWread(src, &ch, 1, 1) ) {
                         error = "file truncated";
                         goto done;
                     }
@@ -176,7 +174,7 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
                         count = 1;
                     } else {
                         count = ch - 0xc0;
-                        if ( SDL_RWread(src, &ch, 1) != 1 ) {
+                        if( !SDL_RWread(src, &ch, 1, 1) ) {
                             error = "file truncated";
                             goto done;
                         }
@@ -206,7 +204,7 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
             }
         } else if ( src_bits == 8 ) {
             /* Copy the row directly */
-            SDL_memcpy(row, buf, SDL_min((size_t)width, bpl));
+            SDL_memcpy(row, buf, SDL_min(width, bpl));
         } else if ( src_bits == 24 ) {
             /* de-interlace planes */
             Uint8 *innerSrc = buf;
@@ -239,29 +237,23 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
         surface->format->palette->ncolors = nc;
         if ( src_bits == 8 ) {
             Uint8 ch;
-            Uint8 colormap[768];
-
             /* look for a 256-colour palette */
             do {
-                if ( SDL_RWread(src, &ch, 1) != 1 ) {
+                if ( !SDL_RWread(src, &ch, 1, 1) ) {
                     /* Couldn't find the palette, try the end of the file */
-                    SDL_RWseek(src, -768, SDL_RW_SEEK_END);
+                    SDL_RWseek(src, -768, RW_SEEK_END);
                     break;
                 }
             } while ( ch != 12 );
 
-            if ( SDL_RWread(src, colormap, sizeof(colormap)) != sizeof(colormap) ) {
-                error = "file truncated";
-                goto done;
-            }
             for ( i = 0; i < 256; i++ ) {
-                colors[i].r = colormap[i * 3 + 0];
-                colors[i].g = colormap[i * 3 + 1];
-                colors[i].b = colormap[i * 3 + 2];
+                SDL_RWread(src, &colors[i].r, 1, 1);
+                SDL_RWread(src, &colors[i].g, 1, 1);
+                SDL_RWread(src, &colors[i].b, 1, 1);
             }
         } else {
             for ( i = 0; i < nc; i++ ) {
-                colors[i].r = pcxh.Colormap[i * 3 + 0];
+                colors[i].r = pcxh.Colormap[i * 3];
                 colors[i].g = pcxh.Colormap[i * 3 + 1];
                 colors[i].b = pcxh.Colormap[i * 3 + 2];
             }
@@ -271,9 +263,9 @@ SDL_Surface *IMG_LoadPCX_RW(SDL_RWops *src)
 done:
     SDL_free(buf);
     if ( error ) {
-        SDL_RWseek(src, start, SDL_RW_SEEK_SET);
+        SDL_RWseek(src, start, RW_SEEK_SET);
         if ( surface ) {
-            SDL_DestroySurface(surface);
+            SDL_FreeSurface(surface);
             surface = NULL;
         }
         IMG_SetError("%s", error);

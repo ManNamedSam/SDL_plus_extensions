@@ -1,5 +1,5 @@
 /*
-  SDL_image:  An example image loading library for use with SDL
+  SDL_mixer:  An audio mixer library based on the SDL library
   Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
@@ -17,22 +17,20 @@
   2. Altered source versions must be plainly marked as such, and must not be
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
+
+  This is the source needed to decode a Creative Labs VOC file into a
+  waveform. It's pretty straightforward once you get going. The only
+  externally-callable function is Mix_LoadVOC_RW(), which is meant to
+  act as identically to SDL_LoadWAV_RW() as possible.
+
+  This file by Ryan C. Gordon (icculus@icculus.org).
+
+  Heavily borrowed from sox v12.17.1's voc.c.
+        (http://www.freshmeat.net/projects/sox/)
 */
 
-#ifndef SDLIMAGE_IMG_H
-#define SDLIMAGE_IMG_H
+/* Don't call this directly; use Mix_LoadWAV_RW() for now. */
+SDL_AudioSpec *Mix_LoadVOC_RW (SDL_RWops *src, int freesrc,
+        SDL_AudioSpec *spec, Uint8 **audio_buf, Uint32 *audio_len);
 
-extern int IMG_InitAVIF(void);
-extern void IMG_QuitAVIF(void);
-extern int IMG_InitJPG(void);
-extern void IMG_QuitJPG(void);
-extern int IMG_InitJXL(void);
-extern void IMG_QuitJXL(void);
-extern int IMG_InitPNG(void);
-extern void IMG_QuitPNG(void);
-extern int IMG_InitTIF(void);
-extern void IMG_QuitTIF(void);
-extern int IMG_InitWEBP(void);
-extern void IMG_QuitWEBP(void);
-
-#endif
+/* vi: set ts=4 sw=4 expandtab: */

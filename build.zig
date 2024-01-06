@@ -44,6 +44,9 @@ pub fn build(b: *std.Build) void {
             lib.linkFramework("AVFoundation");
             lib.linkFramework("Foundation");
         },
+        .linux => {
+            lib.addCSourceFiles(.{ .files = &linux_src_files });
+        },
         else => {
             const config_header = b.addConfigHeader(.{
                 .style = .{ .cmake = .{ .path = "include/SDL_config.h.cmake" } },

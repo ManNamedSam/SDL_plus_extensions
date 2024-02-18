@@ -44,9 +44,6 @@ pub fn build(b: *std.Build) void {
             lib.linkFramework("AVFoundation");
             lib.linkFramework("Foundation");
         },
-        .linux => {
-            lib.addCSourceFiles(.{ .files = &linux_src_files });
-        },
         else => {
             const config_header = b.addConfigHeader(.{
                 .style = .{ .cmake = .{ .path = "include/SDL_config.h.cmake" } },
@@ -59,7 +56,6 @@ pub fn build(b: *std.Build) void {
     lib.installHeadersDirectory("include", "SDL2");
     b.installArtifact(lib);
 }
-
 const generic_src_files = [_][]const u8{
     "src/SDL.c",
     "src/SDL_assert.c",
